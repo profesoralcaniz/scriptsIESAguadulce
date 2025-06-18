@@ -1,0 +1,97 @@
+// ==UserScript==
+// @name         Exportar notas
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  Extrae nombres y resultados desde Moodle y exporta a CSV sin comillas y con nota 0 por defecto si no hay nota encontrada.
+// @author       Jesús Teruel Medina
+// @match        https://educacionadistancia.juntadeandalucia.es/formacionprofesional/mod/assign/*
+// @grant        none
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    function parseNota(texto) {
+        const match = texto.match(/: ([\d.]+)/);
+        if (match) {
+            const nota = parseFloat(match[1].replace(",", "."));
+            const decimal = nota - Math.floor(nota);
+            const redondeada = decimal >= 0.5 ? Math.ceil(nota) : Math.floor(nota);
+            return redondeada;
+        }
+        return 0; // Si no hay nota, devolver 0
+    }
+
+    function exportarCSV(datos) {
+        const contenido = datos.map(d => `${d.nombre};${d.nota}`).join("\n");
+        const blob = new Blob([contenido], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+
+        const enlace = document.createElement("a");
+        enlace.setAttribute("href", url);
+        enlace.setAttribute("download", "notas.csv");
+        enlace.style.display = "none";
+        document.body.appendChild(enlace);
+        enlace.click();
+        document.body.removeChild(enlace);
+    }
+
+    function obtenerDatos() {
+        const filas = document.querySelectorAll("tr.unselectedrow");
+        const resultados = [];
+
+        filas.forEach(fila => {
+            const nombreEl = fila.querySelector("td.cell.c2 a");
+            const nombre = nombreEl?.innerText.trim().replace(/"/g, "") || "Desconocido";
+
+            const outcomes = fila.querySelectorAll(".columna_entera_outcomes .outcome");
+            let notaFinal = 0;
+
+            for (const outcome of outcomes) {
+                const texto = outcome.textContent.trim();
+                if (texto.includes(":")) {
+                    const match = texto.match(/: ([\d.,]+)/);
+                    if (match) {
+                        notaFinal = parseNota(match[0]);
+                        break;
+                    }
+                }
+            }
+
+            resultados.push({ nombre, nota: notaFinal });
+        });
+
+        return resultados;
+    }
+
+    function crearBoton() {
+        const btn = document.createElement("button");
+        btn.textContent = "📥 Exportar Notas CSV";
+        btn.style.position = "fixed";
+        btn.style.bottom = "100px";
+        btn.style.right = "20px";
+        btn.style.zIndex = 9999;
+        btn.style.padding = "10px 15px";
+        btn.style.fontSize = "14px";
+        btn.style.backgroundColor = "#2e7d32";
+        btn.style.color = "white";
+        btn.style.border = "none";
+        btn.style.borderRadius = "5px";
+        btn.style.cursor = "pointer";
+
+        btn.addEventListener("click", () => {
+            const datos = obtenerDatos();
+            exportarCSV(datos);
+        });
+
+        document.body.appendChild(btn);
+    }
+
+    if (window.location.href.includes("/mod/assign/")) {
+        window.addEventListener("load", () => {
+            setTimeout(crearBoton, 1000);
+        });
+    }
+
+})();
+
