@@ -21,8 +21,14 @@
         // Si termina en .00, devolvemos solo el entero
         if (texto.endsWith(".00")) {
             return String(parseInt(numero));
-        }
+        }else{
+            if((numero-parseInt(numero))>=0.5){
+                return parseInt(numero)+1;
+            }else{
+                return parseInt(numero);
+            }
 
+        }
         return texto; // Mantener formato original si no termina en .00
     }
 
